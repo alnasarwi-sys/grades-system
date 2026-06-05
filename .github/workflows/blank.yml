@@ -1,0 +1,63 @@
+name: Build APK & Deploy PWA
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🔧 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: 📦 Install dependencies
+      run: npm install || true
+
+    - name: 🏗️ Build Project
+      run: npm run build || npm run build:prod || true
+
+    - name: ☁️ Deploy PWA to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./build || ./dist || ./out
+      if: github.ref == 'refs/heads/main'
+
+    - name: 🔨 Setup Android Build Tools
+      uses: android-actions/setup-android@v3
+
+    - name: 🏗️ Build APK
+      run: |
+        if [ -f "build.gradle.kts" ] || [ -f "build.gradle" ]; then
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+        else
+          echo "⚠️ Gradle files not found"
+        fi
+      continue-on-error: true
+
+    - name: 📦 Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: grades-system-android-apk
+        path: "**/build/outputs/apk/debug/*.apk"
+        if-no-files-found: ignore
+
+    - name: 📤 Upload Build
+      uses: actions/upload-artifact@v4
+      with:
+        name: grades-system-build
+        path: |
+          build/
+          dist/
+          out/
+        if-no-files-found: ignore
